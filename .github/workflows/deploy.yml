@@ -65,7 +65,7 @@ jobs:
           IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.FRONTEND_ECR }}:latest
           docker build \
             -t $IMAGE_URI \
-            -f frontend/react-shop/Dockerfile frontend/react-shop
+            -f frontend/react-redux-registration-login-example/Dockerfile frontend/react-redux-registration-login-example
           docker push $IMAGE_URI
 
       - name: Deploy Frontend to ECS
@@ -102,7 +102,7 @@ jobs:
           IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.BACKEND_ECR }}:latest
           docker build \
             -t $IMAGE_URI \
-            -f backend/django-ecommerce/Dockerfile backend/django-ecommerce
+            -f backend/djoser/Dockerfile backend/djoser
           docker push $IMAGE_URI
 
       - name: Deploy Backend to ECS
