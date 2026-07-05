@@ -90,49 +90,15 @@ EOF
 
 # Auto Scaling Group
 resource "aws_autoscaling_group" "ecs_asg" {
-  desired_capacity    = 3
-  min_size            = 2
-  max_size            = 4
+  desired_capacity    = 2
+  min_size            = 1
+  max_size            = 3
   vpc_zone_identifier = [aws_subnet.public_1.id, aws_subnet.public_2.id]
 
   launch_template {
     id      = aws_launch_template.ecs_lt.id
     version = "$Latest"
   }
-}
-
-# MySQL Task Definition
-resource "aws_ecs_task_definition" "mysql" {
-  family                   = "mysql-task"
-  network_mode             = "bridge"
-  requires_compatibilities = ["EC2"]
-  cpu                      = "512"
-  memory                   = "1024"
-  execution_role_arn       = aws_iam_role.ecs_task_role.arn
-
-  container_definitions = jsonencode([{
-    name  = "mysql"
-    image = "mysql:8.0"
-    portMappings = [{
-      containerPort = 3306
-      hostPort      = 3306
-    }]
-    environment = [
-      { name = "MYSQL_ROOT_PASSWORD", value = "rootpassword" },
-      { name = "MYSQL_DATABASE",      value = "ecommerce" },
-      { name = "MYSQL_USER",          value = "djangouser" },
-      { name = "MYSQL_PASSWORD",      value = "djangopass" }
-    ]
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = "/ecs/mysql-task"
-        "awslogs-region"        = "ap-southeast-1"
-        "awslogs-stream-prefix" = "ecs"
-        "awslogs-create-group"  = "true"
-      }
-    }
-  }])
 }
 
 # Frontend Task Definition
@@ -163,48 +129,68 @@ resource "aws_ecs_task_definition" "frontend" {
   }])
 }
 
-# Backend Task Definition
+# Backend + MySQL Combined Task Definition
 resource "aws_ecs_task_definition" "backend" {
   family                   = "backend-task"
   network_mode             = "bridge"
   requires_compatibilities = ["EC2"]
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = "768"
+  memory                   = "1536"
   execution_role_arn       = aws_iam_role.ecs_task_role.arn
 
-  container_definitions = jsonencode([{
-    name  = "backend"
-    image = "${aws_ecr_repository.backend.repository_url}:latest"
-    portMappings = [{
-      containerPort = 8000
-      hostPort      = 8000
-    }]
-    environment = [
-      { name = "DB_HOST",     value = "mysql" },
-      { name = "DB_NAME",     value = "ecommerce" },
-      { name = "DB_USER",     value = "djangouser" },
-      { name = "DB_PASSWORD", value = "djangopass" },
-      { name = "DB_PORT",     value = "3306" }
-    ]
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = "/ecs/backend-task"
-        "awslogs-region"        = "ap-southeast-1"
-        "awslogs-stream-prefix" = "ecs"
-        "awslogs-create-group"  = "true"
+  container_definitions = jsonencode([
+    {
+      name  = "mysql"
+      image = "mysql:8.0"
+      portMappings = [{
+        containerPort = 3306
+        hostPort      = 3306
+      }]
+      environment = [
+        { name = "MYSQL_ROOT_PASSWORD", value = "rootpassword" },
+        { name = "MYSQL_DATABASE",      value = "ecommerce" },
+        { name = "MYSQL_USER",          value = "djangouser" },
+        { name = "MYSQL_PASSWORD",      value = "djangopass" }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = "/ecs/mysql-task"
+          "awslogs-region"        = "ap-southeast-1"
+          "awslogs-stream-prefix" = "ecs"
+          "awslogs-create-group"  = "true"
+        }
+      }
+    },
+    {
+      name  = "backend"
+      image = "${aws_ecr_repository.backend.repository_url}:latest"
+      portMappings = [{
+        containerPort = 8000
+        hostPort      = 8000
+      }]
+      links = ["mysql:mysql"]
+      environment = [
+        { name = "SECRET_KEY",             value = "QdmVRKh8ObhMIU1Q16EFpfJt9z4wa92ZX0VBnMEYkfQbhUwzebgo1IkmBzTCZuhM8C8" },
+        { name = "DEBUG",                  value = "True" },
+        { name = "DJANGO_SETTINGS_MODULE", value = "djecommerce.settings.development" },
+        { name = "DB_HOST",                value = "mysql" },
+        { name = "DB_NAME",                value = "ecommerce" },
+        { name = "DB_USER",                value = "djangouser" },
+        { name = "DB_PASSWORD",            value = "django" },
+        { name = "DB_PORT",                value = "3306" }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = "/ecs/backend-task"
+          "awslogs-region"        = "ap-southeast-1"
+          "awslogs-stream-prefix" = "ecs"
+          "awslogs-create-group"  = "true"
+        }
       }
     }
-  }])
-}
-
-# MySQL ECS Service
-resource "aws_ecs_service" "mysql" {
-  name            = "mysql-service"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.mysql.arn
-  desired_count   = 1
-  launch_type     = "EC2"
+  ])
 }
 
 # Frontend ECS Service
