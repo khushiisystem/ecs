@@ -35,10 +35,6 @@ jobs:
         run: terraform init
         working-directory: ./terraform
 
-      - name: Terraform Destroy
-        run: terraform  destroy -auto-approve
-        working-directory: ./terraform
-
       - name: Terraform Apply
         run: terraform apply -auto-approve
         working-directory: ./terraform
@@ -68,10 +64,8 @@ jobs:
         run: |
           IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.FRONTEND_ECR }}:latest
           docker build \
-            --build-arg VITE_API_BASE_URL=http://13.214.127.52:8000 \
-            --build-arg VITE_APP_ENV=production \
             -t $IMAGE_URI \
-            -f frontend/FE-Portal/Dockerfile frontend/FE-Portal
+            -f frontend/react-shop/Dockerfile frontend/react-shop
           docker push $IMAGE_URI
 
       - name: Deploy Frontend to ECS
@@ -106,7 +100,9 @@ jobs:
       - name: Build & Push Backend Image
         run: |
           IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.BACKEND_ECR }}:latest
-          docker build -t $IMAGE_URI -f backend/TranningAndCertification/Dockerfile backend/TranningAndCertification
+          docker build \
+            -t $IMAGE_URI \
+            -f backend/django-ecommerce/Dockerfile backend/django-ecommerce
           docker push $IMAGE_URI
 
       - name: Deploy Backend to ECS
